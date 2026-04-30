@@ -1,0 +1,43 @@
+name: arpy
+description: Augmented Reality for Python Programming Education
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  google_fonts: ^6.1.0
+  flutter_svg: ^2.0.9
+  camera: ^0.10.5+5
+  permission_handler: ^12.0.1
+  shared_preferences: ^2.5.4
+  intl: ^0.19.0
+  file_picker: ^10.3.10
+  url_launcher: ^6.1.10
+  pdf: ^3.11.0
+  printing: ^5.10.4
+  model_viewer_plus: ^1.9.3
+  provider: ^6.0.0
+  image: ^4.0.0
+  vector_math: ^2.1.0
+  # ARCore-specific plugins removed. `android_intent_plus` not required anymore.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/logos/
+    - assets/ARCard/
+    - assets/3d/
