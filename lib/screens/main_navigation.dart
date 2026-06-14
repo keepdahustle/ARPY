@@ -4,7 +4,8 @@ import 'home_screen.dart';
 import 'tasks_screen.dart';
 import 'help_screen.dart';
 import 'profile_screen.dart';
-import 'ar_scan_screen.dart';
+// import 'ar_scan_screen.dart';
+import 'materi_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -15,7 +16,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
-  
+
   final List<Widget> _screens = [
     const HomeScreen(),
     const TasksScreen(),
@@ -25,7 +26,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _navigateToAR() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const ARScanScreen()),
+      MaterialPageRoute(builder: (context) => const MateriScreen()),
     );
   }
 
@@ -48,20 +49,21 @@ class _MainNavigationState extends State<MainNavigation> {
             ),
             child: BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
-                // Mapkan selected item BottomNavigationBar -> screen index
-                // _currentIndex menyimpan screen index (0..3). Karena BottomNavigationBar
-                // mempunyai spacer di posisi 2, kita harus memetakan screenIndex->navIndex:
-                // screen 0 -> nav 0, screen 1 -> nav 1, screen 2 -> nav 3, screen 3 -> nav 4
-                currentIndex: _currentIndex < 2 ? _currentIndex : _currentIndex + 1,
-                onTap: (index) {
-                  // Jika spacer (index == 2) ditekan, abaikan
-                  if (index == 2) return;
-                  // Map NavBar index ke screen index (skip spacer di index 2)
-                  int screenIndex = index < 2 ? index : index - 1;
-                  setState(() {
-                    _currentIndex = screenIndex;
-                  });
-                },
+              // Mapkan selected item BottomNavigationBar -> screen index
+              // _currentIndex menyimpan screen index (0..3). Karena BottomNavigationBar
+              // mempunyai spacer di posisi 2, kita harus memetakan screenIndex->navIndex:
+              // screen 0 -> nav 0, screen 1 -> nav 1, screen 2 -> nav 3, screen 3 -> nav 4
+              currentIndex:
+                  _currentIndex < 2 ? _currentIndex : _currentIndex + 1,
+              onTap: (index) {
+                // Jika spacer (index == 2) ditekan, abaikan
+                if (index == 2) return;
+                // Map NavBar index ke screen index (skip spacer di index 2)
+                int screenIndex = index < 2 ? index : index - 1;
+                setState(() {
+                  _currentIndex = screenIndex;
+                });
+              },
               selectedItemColor: AppColors.primaryDarkBlue,
               unselectedItemColor: Colors.grey[400],
               backgroundColor: Colors.white,
@@ -128,7 +130,8 @@ class _MainNavigationState extends State<MainNavigation> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primaryDarkBlue.withAlpha((0.3 * 255).round()),
+                      color: AppColors.primaryDarkBlue
+                          .withAlpha((0.3 * 255).round()),
                       spreadRadius: 2,
                       blurRadius: 8,
                       offset: const Offset(0, 4),
