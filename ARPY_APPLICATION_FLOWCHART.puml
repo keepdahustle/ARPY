@@ -1,0 +1,169 @@
+@startuml ARPY_Application_Flow
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam FontName Poppins
+skinparam FontSize 11
+skinparam ArrowColor #003366
+skinparam ActivityBkgColor #E8F1F8
+skinparam ActivityBorderColor #003366
+skinparam DecisionBkgColor #FFF4E6
+skinparam DecisionBorderColor #FF8C42
+
+start
+
+' ===== LOGIN & REGISTRATION FLOW =====
+:Periksa Status Login;
+if (Sudah Login Sebelumnya?) then (Ya)
+  goto main_navigation
+else (Tidak)
+endif
+
+:Tampilkan Login Screen;
+:Masukkan Email & Password;
+
+if (Data Login Valid?) then (Ya)
+  :Simpan Status Login;
+  goto main_navigation
+else (Tidak)
+  :Tampilkan Pesan Error;
+  :Clear Input Fields;
+endif
+
+if (Punya Akun?) then (Tidak)
+  :Buka Register Screen;
+  :Isi Data Profil Baru;
+  :Buat Akun Baru;
+  :Simpan Data Akun;
+  :Kembali ke Login Screen;
+  goto start
+else (Ya)
+  goto start
+endif
+
+' ===== MAIN NAVIGATION HUB =====
+label main_navigation
+:Tampilkan Main Navigation;
+:Pilih Menu Utama;
+
+if (Pilih Home?) then (Ya)
+  goto home_flow
+else (Tidak)
+endif
+
+if (Pilih Tasks?) then (Ya)
+  goto tasks_flow
+else (Tidak)
+endif
+
+if (Pilih Help?) then (Ya)
+  goto help_flow
+else (Tidak)
+endif
+
+if (Pilih Profile?) then (Ya)
+  goto profile_flow
+else (Tidak)
+endif
+
+' ===== HOME FLOW =====
+label home_flow
+:Tampilkan Materi Pembelajaran\n(Integer, Float, String, Set);
+
+if (Pilih Materi?) then (Ya)
+  :Buka AR Scan Screen;
+else (Tidak)
+  goto main_navigation
+endif
+
+:Minta Izin Camera;
+
+if (Izin Diberikan?) then (Ya)
+  :Tampilkan Camera Preview;
+else (Tidak)
+  :Tampilkan Error Camera;
+  goto main_navigation
+endif
+
+if (Kartu Terdeteksi?) then (Ya)
+  :Tampilkan AR Result Screen;
+else (Tidak)
+  :Tunggu Deteksi;
+  goto home_flow
+endif
+
+:Tampilkan 3D Model Viewer;
+:Tampilkan Deskripsi Materi;
+
+if (User Ingin Detail?) then (Ya)
+  :Buka Material Detail Screen;
+else (Tidak)
+endif
+
+goto main_navigation
+
+' ===== TASKS FLOW =====
+label tasks_flow
+:Tampilkan Tasks Menu;
+:Pilih Quiz atau Projects;
+
+if (Quiz?) then (Ya)
+  :Tampilkan Materi Quiz;
+  :Pilih Material untuk Quiz;
+  :Mulai Quiz;
+  :Tampilkan Pertanyaan (1-5);
+  :Pengguna Pilih Jawaban;
+  :Hitung Skor Akhir;
+  
+  if (Skor >= 4/5?) then (Lulus)
+    :Tampilkan Hasil Lulus;
+    :Berikan Poin Reward;
+  else (Gagal)
+    :Tampilkan Hasil Gagal;
+    :Tawarkan Coba Lagi;
+  endif
+  
+else (Projects)
+  :Tampilkan Daftar Projects;
+  :Pilih Project;
+  :Tampilkan Project Detail;
+  :Kirim Hasil Pekerjaan;
+  :Simpan Submission;
+endif
+
+goto main_navigation
+
+' ===== HELP FLOW =====
+label help_flow
+:Tampilkan FAQ Screen;
+:Tampilkan Daftar Pertanyaan;
+
+if (Pilih FAQ?) then (Ya)
+  :Tampilkan Jawaban FAQ;
+else (Tidak)
+endif
+
+goto main_navigation
+
+' ===== PROFILE FLOW =====
+label profile_flow
+:Tampilkan Profile Screen;
+:Tampilkan Info Pengguna\n(Nama, Sekolah, Poin, Stats);
+
+if (User Ingin Edit?) then (Ya)
+  :Buka Edit Profile;
+  :Ubah Data Profil;
+  :Simpan Perubahan;
+  :Kembali ke Profile;
+else (Logout)
+  :Konfirmasi Logout;
+  :Hapus Status Login;
+  :Hapus Data Session;
+  :Kembali ke Login Screen;
+  stop
+endif
+
+goto main_navigation
+
+end
+
+@enduml
