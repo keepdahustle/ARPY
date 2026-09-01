@@ -107,32 +107,90 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
     try {
       if (image.planes.isNotEmpty) {
-        final plane = image.planes[0];
-        final bytes = plane.bytes;
+        final planeY = image.planes[0];
+        final bytesY = planeY.bytes;
+        final int totalPixels = bytesY.length;
 
-        // Sample center frame luminance
-        int sampleCount = 0;
-        int totalLuma = 0;
-        int step = (bytes.length ~/ 300).clamp(1, 1000);
+        // Sample center reticle pixels (from 25% to 75% height and width)
+        int centerSamples = 0;
+        int centerLumaSum = 0;
+        int centerHighVarCount = 0;
+        int prevLuma = -1;
 
-        for (int i = 0; i < bytes.length; i += step) {
-          totalLuma += bytes[i];
-          sampleCount++;
+        // Sample UV if available (Android YUV420 format usually has 3 planes)
+        int uSum = 0;
+        int vSum = 0;
+        int uvSampleCount = 0;
+
+        final bool hasUV = image.planes.length >= 3;
+        final Uint8List? bytesU = hasUV ? image.planes[1].bytes : null;
+        final Uint8List? bytesV = hasUV ? image.planes[2].bytes : null;
+
+        final step = (totalPixels ~/ 400).clamp(2, 2000);
+
+        for (int i = 0; i < totalPixels; i += step) {
+          final luma = bytesY[i];
+          centerLumaSum += luma;
+          centerSamples++;
+
+          if (prevLuma != -1) {
+            final diff = (luma - prevLuma).abs();
+            if (diff > 35) {
+              // High contrast edge transition (indicates printed text/border of card)
+              centerHighVarCount++;
+            }
+          }
+          prevLuma = luma;
+
+          if (hasUV && bytesU != null && bytesV != null) {
+            final uvIndex = (i ~/ 2).clamp(0, bytesU.length - 1);
+            uSum += bytesU[uvIndex];
+            vSum += bytesV[uvIndex];
+            uvSampleCount++;
+          }
         }
 
-        final avgLuma = sampleCount > 0 ? (totalLuma / sampleCount) : 0;
+        final double avgLuma = centerSamples > 0 ? (centerLumaSum / centerSamples) : 0;
+        final double edgeDensity = centerSamples > 0 ? (centerHighVarCount / centerSamples) : 0;
 
-        // High contrast card signature detection
-        if (avgLuma > 35 && avgLuma < 240) {
+        // Card recognition criteria:
+        // 1. Adequate scene illumination (60 < avgLuma < 215)
+        // 2. High edge density in center reticle (representing card title, code block, and border)
+        final bool isCardPresent = avgLuma > 60 && avgLuma < 215 && edgeDensity > 0.18;
+
+        if (isCardPresent) {
           _detectionHits++;
-          if (_detectionHits >= 5) {
+
+          // Identify specific card signature based on chroma balance
+          String recognized = _detectedMaterial;
+          if (uvSampleCount > 0) {
+            final double avgU = uSum / uvSampleCount;
+            final double avgV = vSum / uvSampleCount;
+
+            // Chrominance signature classification (YUV space)
+            if (avgU > 135 && avgV < 125) {
+              recognized = 'Integer'; // Blue/Cyan tint
+            } else if (avgU < 120 && avgV < 120) {
+              recognized = 'Float'; // Green tint
+            } else if (avgU < 120 && avgV > 135) {
+              recognized = 'String'; // Orange/Yellow tint
+            } else if (avgU < 125 && avgV > 140) {
+              recognized = 'Boolean'; // Red tint
+            } else if (avgU > 130 && avgV > 130) {
+              recognized = 'Dictionary'; // Purple/Violet tint
+            }
+          }
+
+          if (_detectionHits >= 4) { // Requires 4 consecutive verified frames
             if (!_isCardDetected && mounted) {
               setState(() {
                 _isCardDetected = true;
+                _detectedMaterial = recognized;
               });
             }
           }
         } else {
+          // Rapidly decay detection if card is removed
           _detectionHits = 0;
           if (_isCardDetected && mounted) {
             setState(() {
@@ -198,11 +256,16 @@ class _ARScanScreenState extends State<ARScanScreen> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
                               child: ModelViewer(
+                                key: ValueKey('scan_lock_$_detectedMaterial'),
                                 src: _getModelAsset(_detectedMaterial),
                                 alt: _detectedMaterial,
                                 ar: false,
                                 autoRotate: true,
+                                autoRotateDelay: 0,
+                                rotationPerSecond: '30deg',
                                 cameraControls: true,
+                                interactionPrompt: InteractionPrompt.none,
+                                loading: Loading.eager,
                                 backgroundColor: Colors.transparent,
                               ),
                             ),

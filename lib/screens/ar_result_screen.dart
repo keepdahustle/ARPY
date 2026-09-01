@@ -17,8 +17,6 @@ class ARResultScreen extends StatefulWidget {
 }
 
 class _ARResultScreenState extends State<ARResultScreen> {
-  double _rotation = 0.0; // degrees for camera orbit
-
   @override
   Widget build(BuildContext context) {
     final materialName = widget.materialName;
@@ -76,55 +74,46 @@ class _ARResultScreenState extends State<ARResultScreen> {
                   // 3D Model Viewer (model_viewer_plus)
                   Container(
                     width: double.infinity,
-                    height: 320,
+                    height: 340,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      color: const Color(0xFFE2E8F0), // Soft grey background for clear 3D geometry contrast
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.secondaryLightBlue.withAlpha((0.3 * 255).round()),
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withAlpha((0.12 * 255).round()),
-                          blurRadius: 10,
+                          color: Colors.black.withAlpha((0.08 * 255).round()),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(18),
                       child: ModelViewer(
+                        key: ValueKey('model_${materialName}_${_getModelAsset(materialName)}'),
                         src: _getModelAsset(materialName),
                         alt: materialName,
                         ar: true,
-                        autoRotate: false,
+                        autoRotate: true,
+                        autoRotateDelay: 0,
+                        rotationPerSecond: '25deg',
                         cameraControls: true,
-                        // cameraOrbit expects something like "0deg 75deg 90deg"
-                        cameraOrbit: '0deg 75deg ${_rotation}deg',
-                        backgroundColor: Colors.transparent,
+                        interactionPrompt: InteractionPrompt.auto,
+                        loading: Loading.eager,
+                        backgroundColor: const Color(0xFFE2E8F0),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 12),
-                  // Rotation slider
-                  Row(
-                    children: [
-                      const Icon(Icons.rotate_right, color: Colors.grey),
-                      Expanded(
-                        child: Slider(
-                          min: 0,
-                          max: 360,
-                          divisions: 36,
-                          value: _rotation,
-                          onChanged: (v) => setState(() => _rotation = v),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   Text(
                     _getDescription(materialName),
                     style: GoogleFonts.poppins(
                       fontSize: 14,
-                      color: Colors.grey[700],
+                      color: Colors.grey[800],
                       height: 1.5,
                     ),
                   ),
