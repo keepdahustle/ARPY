@@ -4,8 +4,7 @@ import 'home_screen.dart';
 import 'tasks_screen.dart';
 import 'help_screen.dart';
 import 'profile_screen.dart';
-// import 'ar_scan_screen.dart';
-import 'materi_screen.dart';
+import 'ar_scan_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -26,7 +25,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _navigateToAR() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const MateriScreen()),
+      MaterialPageRoute(builder: (context) => const ARScanScreen()),
     );
   }
 
