@@ -15,24 +15,18 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-<<<<<<< HEAD
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   String _displayName = 'User';
-=======
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  String _displayName = 'User';
+  int _passedQuizzes = 0;
+  int _completedProjects = 0;
+  int _totalPoints = 0;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
->>>>>>> improve/home-screen-ui
 
   @override
   void initState() {
     super.initState();
-<<<<<<< HEAD
-    _loadUser();
-=======
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -47,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen>
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
     _loadUser();
+    _loadStats();
     _fadeController.forward();
   }
 
@@ -54,52 +49,42 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _fadeController.dispose();
     super.dispose();
->>>>>>> improve/home-screen-ui
   }
 
   Future<void> _loadUser() async {
     final data = await StorageService.getUserData();
     if (mounted) {
       setState(() {
-<<<<<<< HEAD
         _displayName = (data?['username'] as String?) ?? (data?['fullName'] as String?) ?? 'User';
-=======
-        _displayName =
-            (data?['username'] as String?) ??
-            (data?['fullName'] as String?) ??
-            'User';
->>>>>>> improve/home-screen-ui
       });
     }
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final passed = await StorageService.getUniquePassedQuizCount(minCorrect: 4);
+      final projects = await StorageService.getProjectProgress();
+      final completedProj = projects.where((p) => p['status'] == 'submitted' || p['status'] == 'completed').length;
+      int points = passed * 15;
+      for (final p in projects) {
+        if (p['status'] == 'submitted' || p['status'] == 'completed') {
+          int days = p['estimatedDays'] ?? 2;
+          points += (days >= 6 ? 60 : (days >= 4 ? 50 : 40));
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _passedQuizzes = passed;
+          _completedProjects = completedProj;
+          _totalPoints = points;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-<<<<<<< HEAD
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Image.asset(
-                    'assets/images/arpy_logo.png',
-                    height: 40,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Text(
-                      'ARPY',
-                      style: GoogleFonts.poppins(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primaryDarkBlue,
-                      ),
-                    ),
-                  ),
-=======
       backgroundColor: AppColors.backgroundWhite,
       body: Column(
         children: [
@@ -129,7 +114,11 @@ class _HomeScreenState extends State<HomeScreen>
 
                       // Scan History Section
                       _buildSectionHeader('Histori Scan', () {
-                        // Navigate to full history
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const QuizMaterialsScreen(),
+                          ),
+                        );
                       }),
                       const SizedBox(height: 12),
 
@@ -140,7 +129,13 @@ class _HomeScreenState extends State<HomeScreen>
                               title: 'Integer',
                               tag: 'Tipe Data',
                               description: 'Penjelasan Tipe Data Integer',
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const ARResultScreen(materialName: 'Integer'),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -149,7 +144,47 @@ class _HomeScreenState extends State<HomeScreen>
                               title: 'Float',
                               tag: 'Tipe Data',
                               description: 'Penjelasan Tipe Data Float',
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const ARResultScreen(materialName: 'Float'),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ScanHistoryCard(
+                              title: 'String',
+                              tag: 'Tipe Data',
+                              description: 'Manipulasi & Sequence Teks',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const ARResultScreen(materialName: 'String'),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ScanHistoryCard(
+                              title: 'Boolean',
+                              tag: 'Tipe Data',
+                              description: 'Evaluasi Logika True/False',
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const ARResultScreen(materialName: 'Boolean'),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -192,40 +227,30 @@ class _HomeScreenState extends State<HomeScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // ARPY Logo
-                  Image.network(
-                    'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ARPY-Logo-iHhElAnuiM1Ik5hDUYZKKSf5AiY7rQ.png',
+                  Image.asset(
+                    'assets/images/arpy_logo.png',
                     height: 36,
                     fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Text(
+                      'ARPY',
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
 
                   // Avatar button
->>>>>>> improve/home-screen-ui
                   GestureDetector(
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-<<<<<<< HEAD
-                          builder: (context) => const ProfileScreen(showBackButton: true),
-=======
-                          builder: (_) =>
-                              const ProfileScreen(showBackButton: true),
->>>>>>> improve/home-screen-ui
+                          builder: (_) => const ProfileScreen(showBackButton: true),
                         ),
                       );
                     },
                     child: Container(
-<<<<<<< HEAD
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.grey,
-=======
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
@@ -240,119 +265,11 @@ class _HomeScreenState extends State<HomeScreen>
                         Icons.person_rounded,
                         color: Colors.white,
                         size: 24,
->>>>>>> improve/home-screen-ui
                       ),
                     ),
                   ),
                 ],
               ),
-<<<<<<< HEAD
-            ),
-            
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Extra top spacing to push greeting & cards lower (logo remains)
-                    const SizedBox(height: 36),
-
-                    // Greeting
-                    Text(
-                      'Halo, $_displayName!',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDarkBlue,
-                      ),
-                    ),
-                    Text(
-                      'Selamat datang di Augmented Reality Python',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    // AR Card Download
-                    const ARCardWidget(),
-                    const SizedBox(height: 32),
-                    
-                    // Scan History Section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Histori Scan',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primaryDarkBlue,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const QuizMaterialsScreen(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'Lihat Semua',
-                            style: GoogleFonts.poppins(
-                              color: AppColors.secondaryLightBlue,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // History Cards Grid
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ScanHistoryCard(
-                            title: 'Integer',
-                            tag: 'Tipe Data',
-                            description: 'Penjelasan Tipe Data Integer',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const ARResultScreen(materialName: 'Integer'),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ScanHistoryCard(
-                            title: 'Float',
-                            tag: 'Tipe Data',
-                            description: 'Penjelasan Tipe Data Float',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const ARResultScreen(materialName: 'Float'),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 60), // Space for NavBar (reduced so content sits closer)
-                  ],
-                ),
-              ),
-            ),
-          ],
-=======
 
               const SizedBox(height: 20),
 
@@ -367,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               const SizedBox(height: 4),
               Text(
-                'Siap belajar Python hari ini?',
+                'Siap belajar Python dengan Augmented Reality?',
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   color: Colors.white.withAlpha((0.85 * 255).round()),
@@ -376,13 +293,10 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ],
           ),
->>>>>>> improve/home-screen-ui
         ),
       ),
     );
   }
-<<<<<<< HEAD
-=======
 
   /// Section header with optional "Lihat Semua" action
   Widget _buildSectionHeader(String title, VoidCallback? onViewAll) {
@@ -419,9 +333,9 @@ class _HomeScreenState extends State<HomeScreen>
       children: [
         Expanded(
           child: _buildStatCard(
-            icon: Icons.qr_code_scanner_rounded,
-            label: 'Total Scan',
-            value: '2',
+            icon: Icons.quiz_rounded,
+            label: 'Quiz Lulus',
+            value: '$_passedQuizzes',
             color: AppColors.primaryDarkBlue,
           ),
         ),
@@ -429,17 +343,17 @@ class _HomeScreenState extends State<HomeScreen>
         Expanded(
           child: _buildStatCard(
             icon: Icons.emoji_events_rounded,
-            label: 'Poin',
-            value: '0',
+            label: 'Total Poin',
+            value: '$_totalPoints',
             color: AppColors.primaryTeal,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
-            icon: Icons.task_alt_rounded,
-            label: 'Task',
-            value: '0',
+            icon: Icons.code_rounded,
+            label: 'Proyek',
+            value: '$_completedProjects',
             color: AppColors.secondaryIndigo,
           ),
         ),
@@ -518,9 +432,7 @@ class _HomeScreenState extends State<HomeScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.secondaryLightBlue.withAlpha(
-                (0.2 * 255).round(),
-              ),
+              color: AppColors.secondaryLightBlue.withAlpha((0.2 * 255).round()),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -535,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tips',
+                  'Tips AR',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -544,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Download kartu AR lalu arahkan kamera ke kartu untuk melihat visualisasi 3D!',
+                  'Pilih kartu target di scanner AR lalu arahkan kamera ke kartu fisik untuk melihat objek 3D secara interaktif!',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: AppColors.textMedium,
@@ -558,5 +470,4 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
->>>>>>> improve/home-screen-ui
 }
