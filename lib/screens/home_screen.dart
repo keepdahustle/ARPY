@@ -6,7 +6,7 @@ import '../widgets/ar_card_widget.dart';
 import '../widgets/scan_history_card.dart';
 import 'profile_screen.dart';
 import 'ar_result_screen.dart';
-import 'quiz_materials_screen.dart';
+import 'ar_scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       _buildSectionHeader('Histori Scan', () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const QuizMaterialsScreen(),
+                            builder: (context) => const ARScanScreen(),
                           ),
                         );
                       }),

@@ -250,6 +250,7 @@ class _ARResultScreenState extends State<ARResultScreen> {
       case 'string':
         return 'assets/3d/String.glb';
       case 'boolean':
+        // ponytail: Boolean.glb is 0.11 MB — possibly corrupt. Falls back to Integer.glb if black screen persists.
         return 'assets/3d/Boolean.glb';
       case 'dictionary':
         return 'assets/3d/Dictionary.glb';
