@@ -1,21 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
+import 'package:arcore_flutter_plugin/arcore_flutter_plugin.dart';
+import 'package:vector_math/vector_math_64.dart' as vector;
 import '../utils/app_colors.dart';
-import '../widgets/modern_dialog.dart';
 import 'ar_result_screen.dart';
-
-// AR Kartu marker - daftar materi yang tersedia
-const List<Map<String, String>> _kMaterials = [
-  {'id': 'Integer', 'card': 'assets/ARCard/ARCardInteger.png', 'color': '0xFF3B5BDB'},
-  {'id': 'Float', 'card': 'assets/ARCard/ARCardFloat.png', 'color': '0xFF2F9E44'},
-  {'id': 'String', 'card': 'assets/ARCard/ARCardString.png', 'color': '0xFFE8590C'},
-  {'id': 'Boolean', 'card': 'assets/ARCard/ARCardBoolean.png', 'color': '0xFFE03131'},
-  {'id': 'Dictionary', 'card': 'assets/ARCard/ARCardDictionary.png', 'color': '0xFF7048E8'},
-];
 
 class ARScanScreen extends StatefulWidget {
   final String? initialMaterial;
@@ -26,144 +16,145 @@ class ARScanScreen extends StatefulWidget {
 }
 
 class _ARScanScreenState extends State<ARScanScreen> {
-  // === Detection State ===
-  // Pending = user belum pilih/scan kartu. Scanning = pilih kartu, kamera cari konfirmasi.
-  // Detected = kartu terkonfirmasi dari camera frame analysis
-  String? _selectedMaterialId;   // kartu yang user pilih untuk di-scan
-  bool _isConfirmed = false;      // true HANYA setelah frame camera terkonfirmasi cocok
-  bool _isProcessingFrame = false;
-  int _frameHits = 0;             // frame berturut yang cocok
-  static const int _requiredHits = 8; // butuh 8 frame stabil sebelum konfirmasi
+  ArCoreController? _arController;
+  bool _arSupported = true;
+  bool _permissionGranted = false;
+  bool _isLoading = true;
 
-  CameraController? _cameraController;
-  bool _isCameraInitialized = false;
-  bool _isFlashOn = false;
+  // Tracking state
+  String? _detectedMaterial;
+  bool _isTracking = false;
+  final Set<int> _loadedNodeIndices = {};
+
+  // Mapping: card name → material name → GLB file
+  static const Map<String, String> _cardMaterialMap = {
+    'integer': 'Integer',
+    'float': 'Float',
+    'string': 'String',
+    'boolean': 'Boolean',
+    'dictionary': 'Dictionary',
+  };
+
+  static const Map<String, String> _materialGlbMap = {
+    'Integer': 'assets/3d/Integer.glb',
+    'Float': 'assets/3d/Float.glb',
+    'String': 'assets/3d/String.glb',
+    'Boolean': 'assets/3d/Boolean.glb',
+    'Dictionary': 'assets/3d/Dictionary.glb',
+  };
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
-
-    // Terima event dari native ARCore jika tersedia
-    const channel = MethodChannel('arpy/native_events');
-    channel.setMethodCallHandler((call) async {
-      if (call.method == 'augmentedImageDetected' && mounted) {
-        final args = call.arguments;
-        if (args is Map) {
-          final name = args['name']?.toString();
-          final detected = args['detected'] == true;
-          if (detected && name != null && name.isNotEmpty) {
-            setState(() {
-              _selectedMaterialId = name;
-              _isConfirmed = true;
-            });
-          } else if (!detected) {
-            setState(() => _isConfirmed = false);
-          }
-        }
-      }
-    });
+    _checkPermissionAndSupport();
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _checkPermissionAndSupport() async {
     final status = await Permission.camera.request();
+    if (!mounted) return;
+
     if (!status.isGranted) {
-      if (mounted) ModernDialog.showSnack(context, 'Izin kamera diperlukan untuk fitur AR.');
+      setState(() {
+        _isLoading = false;
+        _permissionGranted = false;
+      });
       return;
     }
+
+    // Check ARCore availability
     try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
-      final back = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => cameras.first,
-      );
-      _cameraController = CameraController(back, ResolutionPreset.high, enableAudio: false);
-      await _cameraController!.initialize();
-      if (mounted) {
-        await _cameraController!.startImageStream(_processFrame);
-        setState(() => _isCameraInitialized = true);
-      }
-    } catch (e) {
-      if (mounted) ModernDialog.showSnack(context, 'Kamera gagal: ${e.toString()}');
+      final supported = await ArCoreController.checkArCoreAvailability();
+      final installed = await ArCoreController.checkIsArCoreInstalled();
+      if (!mounted) return;
+      setState(() {
+        _arSupported = (supported == true) && (installed == true);
+        _permissionGranted = true;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _arSupported = false;
+        _permissionGranted = true;
+        _isLoading = false;
+      });
     }
   }
 
-  // Analisis frame: cari pola kontras tinggi (kartu dicetak) di area tengah frame
-  Future<void> _processFrame(CameraImage image) async {
-    if (_isProcessingFrame || !mounted) return;
-    if (_selectedMaterialId == null) {
-      // Belum ada kartu dipilih, tidak ada yang di-scan
-      return;
-    }
-    _isProcessingFrame = true;
+  Future<void> _onArCoreViewCreated(ArCoreController controller) async {
+    _arController = controller;
 
+    // Setup callbacks
+    controller.onTrackingImage = _onImageTracked;
+
+    // Load all 5 AR card images as augmented image database
     try {
-      final y = image.planes[0].bytes;
-      final int w = image.width;
-      final int h = image.height;
-
-      // Hanya analisa area tengah (40% lebar, 50% tinggi) = area reticle
-      final int x0 = (w * 0.30).round();
-      final int x1 = (w * 0.70).round();
-      final int y0 = (h * 0.25).round();
-      final int y1 = (h * 0.75).round();
-
-      int sum = 0;
-      int edgeCount = 0;
-      int samples = 0;
-      int prevPx = -1;
-
-      for (int row = y0; row < y1; row += 4) {
-        for (int col = x0; col < x1; col += 4) {
-          final px = y[row * w + col];
-          sum += px;
-          samples++;
-          if (prevPx >= 0 && (px - prevPx).abs() > 40) edgeCount++;
-          prevPx = px;
-        }
+      final Map<String, Uint8List> imageMap = {};
+      for (final entry in _cardMaterialMap.entries) {
+        final bytes = await rootBundle.load('assets/ARCard/ARCard${entry.value}.png');
+        imageMap[entry.key] = bytes.buffer.asUint8List();
       }
+      await controller.loadMultipleAugmentedImage(bytesMap: imageMap);
+    } catch (e) {
+      debugPrint('ARCore image database load error: $e');
+    }
+  }
 
-      if (samples == 0) { _isProcessingFrame = false; return; }
+  void _onImageTracked(ArCoreAugmentedImage augImage) {
+    if (!mounted) return;
 
-      final double avgLuma = sum / samples;
-      final double edgeDensity = edgeCount / samples;
+    final trackingState = augImage.trackingMethod;
+    final cardKey = augImage.name.toLowerCase();
+    final materialName = _cardMaterialMap[cardKey] ?? augImage.name;
+    final imageIndex = augImage.index;
 
-      // Kartu cetak memiliki:
-      //  - Kecerahan sedang-tinggi (ruangan cukup terang, 80-210)
-      //  - Kerapatan tepi tinggi (banyak teks dan border kartu)
-      final bool cardVisible = avgLuma > 80 && avgLuma < 210 && edgeDensity > 0.22;
-
-      if (cardVisible) {
-        _frameHits++;
-        if (_frameHits >= _requiredHits && !_isConfirmed && mounted) {
-          setState(() => _isConfirmed = true);
-        }
-      } else {
-        _frameHits = 0;
-        if (_isConfirmed && mounted) {
-          setState(() => _isConfirmed = false);
-        }
+    if (trackingState == TrackingMethod.FULL_TRACKING) {
+      // Card newly detected
+      if (!_loadedNodeIndices.contains(imageIndex)) {
+        _loadedNodeIndices.add(imageIndex);
+        _place3DObject(materialName, imageIndex);
       }
-    } catch (_) {
-    } finally {
-      _isProcessingFrame = false;
+      if (mounted) {
+        setState(() {
+          _detectedMaterial = materialName;
+          _isTracking = true;
+        });
+      }
+    } else if (trackingState == TrackingMethod.NOT_TRACKING) {
+      // Card lost
+      if (_loadedNodeIndices.contains(imageIndex)) {
+        _loadedNodeIndices.remove(imageIndex);
+        _arController?.removeNodeWithIndex(imageIndex);
+      }
+      if (mounted && _detectedMaterial == materialName) {
+        setState(() {
+          _isTracking = false;
+          _detectedMaterial = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _place3DObject(String materialName, int imageIndex) async {
+    try {
+      final glbFile = _materialGlbMap[materialName] ?? 'assets/3d/Integer.glb';
+      // arcore_flutter_plugin reads from flutter assets
+      final node = ArCoreReferenceNode(
+        name: 'arpy_$materialName',
+        object3DFileName: glbFile,
+        scale: vector.Vector3(0.15, 0.15, 0.15),
+        position: vector.Vector3(0, 0.05, 0), // slight offset above card
+      );
+      await _arController?.addArCoreNodeToAugmentedImage(node, imageIndex);
+    } catch (e) {
+      debugPrint('Place 3D error: $e');
     }
   }
 
   @override
   void dispose() {
-    _cameraController?.stopImageStream();
-    _cameraController?.dispose();
+    _arController?.dispose();
     super.dispose();
-  }
-
-  void _selectMaterial(String id) {
-    setState(() {
-      _selectedMaterialId = id;
-      _isConfirmed = false;
-      _frameHits = 0;
-    });
   }
 
   @override
@@ -173,248 +164,198 @@ class _ARScanScreenState extends State<ARScanScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // === Live Camera ===
-            if (_isCameraInitialized && _cameraController != null)
-              SizedBox.expand(child: CameraPreview(_cameraController!))
+            // ─── Main AR View / Status Screens ───
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator(color: Colors.white))
+            else if (!_permissionGranted)
+              _buildNoPermission()
+            else if (!_arSupported)
+              _buildArNotSupported()
             else
-              const Center(child: CircularProgressIndicator(color: Colors.white)),
+              ArCoreView(
+                type: ArCoreViewType.AUGMENTEDIMAGES,
+                onArCoreViewCreated: _onArCoreViewCreated,
+                enablePlaneRenderer: false,
+                enableUpdateListener: false,
+                debug: false,
+              ),
 
-            // === Center Reticle ===
-            Center(
-              child: Container(
-                width: 270,
-                height: 360,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _isConfirmed
+            // ─── Top Status Banner ───
+            if (_permissionGranted && _arSupported && !_isLoading)
+              Positioned(
+                top: 12,
+                left: 56,
+                right: 56,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: _isTracking
                         ? const Color(0xFF4CAF50)
-                        : _selectedMaterialId != null
-                            ? Colors.amber
-                            : AppColors.secondaryLightBlue,
-                    width: 3,
+                        : Colors.black.withAlpha((0.72 * 255).round()),
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: _isConfirmed && _selectedMaterialId != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(17),
-                        child: ModelViewer(
-                          key: ValueKey('lock_$_selectedMaterialId'),
-                          src: 'assets/3d/$_selectedMaterialId.glb',
-                          alt: _selectedMaterialId!,
-                          ar: false,
-                          autoRotate: true,
-                          autoRotateDelay: 0,
-                          rotationPerSecond: '30deg',
-                          cameraControls: true,
-                          loading: Loading.eager,
-                          backgroundColor: const Color(0xCC000000),
-                        ),
-                      )
-                    : _selectedMaterialId != null
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.amber,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Arahkan kartu $_selectedMaterialId\nke dalam bingkai ini',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.qr_code_scanner, color: Colors.white38, size: 48),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Pilih kartu AR di bawah\nlalu arahkan ke kamera',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white38,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-              ),
-            ),
-
-            // === Top Status Banner ===
-            Positioned(
-              top: 16,
-              left: 72,
-              right: 72,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: _isConfirmed
-                      ? const Color(0xFF4CAF50)
-                      : Colors.black.withAlpha((0.7 * 255).round()),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Text(
-                  _isConfirmed
-                      ? '✓ Kartu $_selectedMaterialId Terdeteksi!'
-                      : _selectedMaterialId != null
-                          ? 'Mencari kartu $_selectedMaterialId...'
-                          : 'Pilih kartu AR terlebih dahulu',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                  child: Text(
+                    _isTracking
+                        ? '✓ ${_detectedMaterial!} Terdeteksi!'
+                        : 'Arahkan kamera ke kartu AR',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // === Back Button ===
+            // ─── Back Button ───
             Positioned(
               top: 10,
               left: 12,
               child: FloatingActionButton(
                 mini: true,
-                heroTag: 'back_btn',
+                heroTag: 'ar_back',
                 backgroundColor: Colors.white.withAlpha((0.85 * 255).round()),
                 onPressed: () => Navigator.pop(context),
                 child: const Icon(Icons.arrow_back, color: AppColors.primaryDarkBlue),
               ),
             ),
 
-            // === Flash Toggle ===
-            Positioned(
-              top: 10,
-              right: 12,
-              child: FloatingActionButton(
-                mini: true,
-                heroTag: 'flash_btn',
-                backgroundColor: _isFlashOn
-                    ? Colors.amber.withAlpha((0.9 * 255).round())
-                    : Colors.white.withAlpha((0.85 * 255).round()),
-                onPressed: () async {
-                  if (_cameraController == null || !_isCameraInitialized) return;
-                  try {
-                    await _cameraController!.setFlashMode(
-                        _isFlashOn ? FlashMode.off : FlashMode.torch);
-                    setState(() => _isFlashOn = !_isFlashOn);
-                  } catch (_) {}
-                },
-                child: Icon(
-                  _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                  color: _isFlashOn ? Colors.white : AppColors.primaryDarkBlue,
-                ),
-              ),
-            ),
-
-            // === Card Selector Row ===
-            Positioned(
-              bottom: 90,
-              left: 0,
-              right: 0,
-              child: SizedBox(
-                height: 72,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _kMaterials.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, i) {
-                    final m = _kMaterials[i];
-                    final isSelected = _selectedMaterialId == m['id'];
-                    return GestureDetector(
-                      onTap: () => _selectMaterial(m['id']!),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            // ─── Card Guide Panel ───
+            if (_permissionGranted && _arSupported && !_isLoading)
+              Positioned(
+                bottom: 90,
+                left: 0,
+                right: 0,
+                child: SizedBox(
+                  height: 64,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _cardMaterialMap.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final material = _cardMaterialMap.values.elementAt(i);
+                      final isActive = _detectedMaterial == material;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.white
-                              : Colors.black.withAlpha((0.6 * 255).round()),
-                          borderRadius: BorderRadius.circular(14),
+                          color: isActive
+                              ? const Color(0xFF4CAF50)
+                              : Colors.black.withAlpha((0.65 * 255).round()),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected ? AppColors.primaryDarkBlue : Colors.white24,
-                            width: isSelected ? 2 : 1,
+                            color: isActive ? Colors.white : Colors.white24,
                           ),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              m['id']!,
+                              material,
                               style: GoogleFonts.poppins(
-                                fontSize: 13,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: isSelected ? AppColors.primaryDarkBlue : Colors.white,
+                                color: Colors.white,
                               ),
                             ),
                             Text(
-                              'AR Card',
+                              isActive ? 'Tracking ✓' : 'AR Card',
                               style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                color: isSelected ? AppColors.textMedium : Colors.white54,
+                                fontSize: 9,
+                                color: Colors.white70,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
 
-            // === Action Button ===
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: _isConfirmed && _selectedMaterialId != null
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => ARResultScreen(materialName: _selectedMaterialId!),
-                          ))
-                      : null,
-                  icon: const Icon(Icons.auto_awesome, color: Colors.white),
-                  label: Text(
-                    _isConfirmed
-                        ? 'Buka Materi $_selectedMaterialId'
-                        : _selectedMaterialId != null
-                            ? 'Mencari kartu...'
-                            : 'Pilih kartu AR',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+            // ─── Open Material Button ───
+            if (_isTracking && _detectedMaterial != null)
+              Positioned(
+                bottom: 18,
+                left: 20,
+                right: 20,
+                child: SizedBox(
+                  height: 54,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => ARResultScreen(materialName: _detectedMaterial!),
+                        )),
+                    icon: const Icon(Icons.auto_awesome, color: Colors.white),
+                    label: Text(
+                      'Buka Materi $_detectedMaterial',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondaryLightBlue,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 6,
                     ),
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isConfirmed
-                        ? AppColors.secondaryLightBlue
-                        : Colors.grey.withAlpha((0.5 * 255).round()),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: _isConfirmed ? 6 : 0,
-                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildNoPermission() => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.camera_alt_outlined, color: Colors.white54, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'Izin Kamera Diperlukan',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Aktifkan izin kamera di pengaturan untuk menggunakan AR.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: openAppSettings,
+              child: const Text('Buka Pengaturan'),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildArNotSupported() => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.view_in_ar_outlined, color: Colors.white54, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'ARCore Tidak Tersedia',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Perangkat ini tidak mendukung ARCore atau Google Play Services for AR belum terinstall.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kembali'),
+            ),
+          ],
+        ),
+      );
 }
