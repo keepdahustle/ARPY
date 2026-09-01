@@ -55,8 +55,8 @@ class QuizResultScreen extends StatelessWidget {
     final percentage = (score / totalQuestions) * 100;
     final grade = _getGrade();
 
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         appBar: AppBar(
           title: Text(

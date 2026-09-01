@@ -35,7 +35,10 @@ class _MainNavigationState extends State<MainNavigation> {
     return Stack(
       children: [
         Scaffold(
-          body: _screens[_currentIndex],
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               boxShadow: [

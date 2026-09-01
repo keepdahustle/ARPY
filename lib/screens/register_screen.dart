@@ -166,10 +166,18 @@ class _RegisterScreenState extends State<RegisterScreen>
                       scale: Tween<double>(begin: 0.5, end: 1.0).animate(
                         CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
                       ),
-                      child: Image.network(
-                        'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ARPY-Logo-iHhElAnuiM1Ik5hDUYZKKSf5AiY7rQ.png',
+                      child: Image.asset(
+                        'assets/images/arpy_logo.png',
                         height: 80,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Text(
+                          'ARPY',
+                          style: GoogleFonts.poppins(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryDarkBlue,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 40),

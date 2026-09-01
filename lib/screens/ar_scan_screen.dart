@@ -9,7 +9,8 @@ import '../widgets/modern_dialog.dart';
 import 'ar_result_screen.dart';
 
 class ARScanScreen extends StatefulWidget {
-  const ARScanScreen({super.key});
+  final String? initialMaterial;
+  const ARScanScreen({super.key, this.initialMaterial});
 
   @override
   State<ARScanScreen> createState() => _ARScanScreenState();
@@ -17,6 +18,15 @@ class ARScanScreen extends StatefulWidget {
 
 class _ARScanScreenState extends State<ARScanScreen> {
   bool _isCardDetected = false;
+  String _selectedMaterial = 'Integer';
+  final List<String> _materials = [
+    'Integer',
+    'Float',
+    'String',
+    'Boolean',
+    'Set',
+    'Dictionary',
+  ];
 
   // Camera controller for live preview
   CameraController? _cameraController;
@@ -26,6 +36,9 @@ class _ARScanScreenState extends State<ARScanScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialMaterial != null && _materials.contains(widget.initialMaterial)) {
+      _selectedMaterial = widget.initialMaterial!;
+    }
     _initializeCamera();
     // Listen for native augmented-image detection events forwarded
     // from Android `MainActivity` via MethodChannel.
@@ -34,12 +47,21 @@ class _ARScanScreenState extends State<ARScanScreen> {
       if (call.method == 'augmentedImageDetected') {
         final args = call.arguments;
         bool detected = true;
-        if (args is Map && args.containsKey('detected')) {
-          detected = args['detected'] == true;
+        String? detectedName;
+        if (args is Map) {
+          if (args.containsKey('detected')) {
+            detected = args['detected'] == true;
+          }
+          if (args.containsKey('name')) {
+            detectedName = args['name']?.toString();
+          }
         }
         if (mounted) {
           setState(() {
             _isCardDetected = detected;
+            if (detectedName != null && _materials.contains(detectedName)) {
+              _selectedMaterial = detectedName;
+            }
           });
         }
       }
@@ -78,9 +100,11 @@ class _ARScanScreenState extends State<ARScanScreen> {
         setState(() {
           _isCameraInitialized = true;
         });
+        _startDetectionSimulation();
       }
     } catch (e) {
       if (mounted) {
+        _startDetectionSimulation();
         ModernDialog.showSnack(context, 'Gagal mengakses kamera: ${e.toString()}');
       }
     }
@@ -135,7 +159,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
                     const Icon(Icons.check_circle, color: Colors.white, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Kartu AR Terdeteksi!',
+                      'Kartu AR $_selectedMaterial Terdeteksi!',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -163,6 +187,61 @@ class _ARScanScreenState extends State<ARScanScreen> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: const AlwaysStoppedAnimation(AppColors.primaryDarkBlue),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Mencari Kartu AR $_selectedMaterial...',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryDarkBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Material Target Selector Chips
+            Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              color: Colors.white,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _materials.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final m = _materials[index];
+                  final isSelected = m == _selectedMaterial;
+                  return ChoiceChip(
+                    label: Text(
+                      m,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected ? Colors.white : AppColors.primaryDarkBlue,
+                      ),
+                    ),
+                    selected: isSelected,
+                    selectedColor: AppColors.primaryDarkBlue,
+                    backgroundColor: AppColors.lightGrey,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedMaterial = m;
+                          _isCardDetected = false;
+                        });
+                        _startDetectionSimulation();
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
                         strokeWidth: 2,
                         valueColor: const AlwaysStoppedAnimation(AppColors.primaryDarkBlue),
                       ),
@@ -338,22 +417,61 @@ class _ARScanScreenState extends State<ARScanScreen> {
     );
   }
   void _navigateToResult() {
-    // ARCore removed — navigate to Flutter AR result page (camera + model viewer)
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const ARResultScreen(materialName: 'Integer'),
+        builder: (context) => ARResultScreen(materialName: _selectedMaterial),
       ),
     );
   }
 
   void _showHelpDialog(BuildContext context) {
-    ModernDialog.showConfirm(
-      context,
-      title: 'Panduan Scanning',
-      message: 'Arahkan kamera ke kartu AR dan pastikan pencahayaan cukup. Kartu akan terdeteksi secara otomatis.',
-      confirmLabel: 'Mengerti',
-      cancelLabel: 'Tutup',
-      onConfirm: () {},
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Target Kartu: $_selectedMaterial',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: AppColors.primaryDarkBlue,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                'assets/ARCard/ARCard$_selectedMaterial.png',
+                height: 160,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 120,
+                  color: AppColors.lightGrey,
+                  child: Center(
+                    child: Text('Kartu $_selectedMaterial'),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Arahkan kamera ke kartu fisik "$_selectedMaterial" dengan pencahayaan yang cukup.',
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Tutup',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

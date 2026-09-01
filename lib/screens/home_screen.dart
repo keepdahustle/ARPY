@@ -5,6 +5,8 @@ import '../utils/storage_service.dart';
 import '../widgets/ar_card_widget.dart';
 import '../widgets/scan_history_card.dart';
 import 'profile_screen.dart';
+import 'ar_result_screen.dart';
+import 'quiz_materials_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -84,10 +86,18 @@ class _HomeScreenState extends State<HomeScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.network(
-                    'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ARPY-Logo-iHhElAnuiM1Ik5hDUYZKKSf5AiY7rQ.png',
+                  Image.asset(
+                    'assets/images/arpy_logo.png',
                     height: 40,
                     fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Text(
+                      'ARPY',
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryDarkBlue,
+                      ),
+                    ),
                   ),
 =======
       backgroundColor: AppColors.backgroundWhite,
@@ -284,7 +294,11 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                         TextButton(
                           onPressed: () {
-                            // Navigate to full history
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const QuizMaterialsScreen(),
+                              ),
+                            );
                           },
                           child: Text(
                             'Lihat Semua',
@@ -297,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // History Cards Grid
                     Row(
                       children: [
@@ -307,7 +321,11 @@ class _HomeScreenState extends State<HomeScreen>
                             tag: 'Tipe Data',
                             description: 'Penjelasan Tipe Data Integer',
                             onTap: () {
-                              // Navigate to Integer visualization
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const ARResultScreen(materialName: 'Integer'),
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -318,7 +336,11 @@ class _HomeScreenState extends State<HomeScreen>
                             tag: 'Tipe Data',
                             description: 'Penjelasan Tipe Data Float',
                             onTap: () {
-                              // Navigate to Float visualization
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const ARResultScreen(materialName: 'Float'),
+                                ),
+                              );
                             },
                           ),
                         ),

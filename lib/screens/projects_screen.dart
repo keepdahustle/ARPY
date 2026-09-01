@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../utils/app_colors.dart';
 import '../utils/app_animations.dart';
+import '../utils/storage_service.dart';
 import '../models/project_model.dart';
 import 'project_detail_screen.dart';
 
@@ -15,6 +16,7 @@ class ProjectsScreen extends StatefulWidget {
 class _ProjectsScreenState extends State<ProjectsScreen> {
   late List<MiniProject> _projects;
   int _completedProjects = 0;
+  Map<String, String> _projectStatusMap = {};
 
   @override
   void initState() {
@@ -22,13 +24,35 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     _loadProjects();
   }
 
-  void _loadProjects() {
+  Future<void> _loadProjects() async {
     _projects = ProjectsDataManager.getAllProjects();
-    // In a real app, fetch completion status from storage
-    // For now, assume all are not started
-    setState(() {
-      _completedProjects = 0;
-    });
+    try {
+      final progressList = await StorageService.getProjectProgress();
+      final statusMap = <String, String>{};
+      int completed = 0;
+      for (final p in progressList) {
+        final id = p['projectId']?.toString() ?? '';
+        final status = p['status']?.toString() ?? 'not-started';
+        if (id.isNotEmpty) {
+          statusMap[id] = status;
+          if (status == 'submitted' || status == 'completed') {
+            completed++;
+          }
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _projectStatusMap = statusMap;
+          _completedProjects = completed;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _completedProjects = 0;
+        });
+      }
+    }
   }
 
   Color _getDifficultyColor(String difficulty) {
@@ -206,14 +230,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Widget _buildProjectCard(BuildContext context, MiniProject project) {
+    final status = _projectStatusMap[project.id] ?? 'not-started';
+    final isDone = status == 'submitted' || status == 'completed';
+
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           AppAnimations.zoomFadePageRoute(
             page: ProjectDetailScreen(project: project),
           ),
         );
+        _loadProjects();
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -222,8 +250,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.lightGrey,
-            width: 1,
+            color: isDone ? AppColors.primaryTeal.withAlpha((0.5 * 255).round()) : AppColors.lightGrey,
+            width: isDone ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
@@ -322,15 +350,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withAlpha((0.1 * 255).round()),
+                    color: isDone
+                        ? AppColors.primaryTeal.withAlpha((0.15 * 255).round())
+                        : Colors.blue.withAlpha((0.1 * 255).round()),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Belum Dimulai',
+                    isDone ? 'Selesai ✓' : 'Belum Dimulai',
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w600,
+                      color: isDone ? AppColors.primaryTeal : Colors.blue[700],
                     ),
                   ),
                 ),
