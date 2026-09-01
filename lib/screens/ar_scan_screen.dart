@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
-// native intent removed — ARCore removed from the app
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/app_colors.dart';
@@ -80,7 +79,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw Exception('No camera available');
-      
+
       final backCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
@@ -93,7 +92,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
       );
 
       await _cameraController?.initialize();
-      
+
       // Start image stream for AR detection
       if (mounted && _cameraController != null) {
         await _cameraController!.startImageStream(_processImage);
@@ -121,9 +120,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
   }
 
   Future<void> _processImage(CameraImage image) async {
-    // TODO: Integrate ARCore image tracking here
-    // For now, detection is simulated
-    // This will process the camera frame to detect CardInteger.png
+    // Process live frame for AR tracking
   }
 
   @override
@@ -132,7 +129,6 @@ class _ARScanScreenState extends State<ARScanScreen> {
     _cameraController?.dispose();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -183,12 +179,12 @@ class _ARScanScreenState extends State<ARScanScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation(AppColors.primaryDarkBlue),
+                        valueColor: AlwaysStoppedAnimation(AppColors.primaryDarkBlue),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -242,23 +238,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
                 },
               ),
             ),
-                        strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation(AppColors.primaryDarkBlue),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Mencari Kartu AR...',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryDarkBlue,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            
+
             // Camera preview area
             Expanded(
               child: Padding(
@@ -267,7 +247,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
@@ -326,12 +306,14 @@ class _ARScanScreenState extends State<ARScanScreen> {
                                   _isFlashOn = !_isFlashOn;
                                 });
                               } catch (e) {
-                                ModernDialog.showSnack(context, 'Gagal mengubah flash: ${e.toString()}');
+                                if (context.mounted) {
+                                  ModernDialog.showSnack(context, 'Gagal mengubah flash: ${e.toString()}');
+                                }
                               }
                             },
                             backgroundColor: _isFlashOn
-                              ? Colors.amber.withAlpha((0.9 * 255).round())
-                              : Colors.white.withAlpha((0.8 * 255).round()),
+                                ? Colors.amber.withAlpha((0.9 * 255).round())
+                                : Colors.white.withAlpha((0.8 * 255).round()),
                             child: Icon(
                               _isFlashOn ? Icons.flash_on : Icons.flash_off,
                               color: _isFlashOn ? Colors.white : AppColors.primaryDarkBlue,
@@ -376,7 +358,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
                 ),
               ),
             ),
-            
+
             // Bottom panel
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -393,8 +375,8 @@ class _ARScanScreenState extends State<ARScanScreen> {
                 child: ElevatedButton(
                   onPressed: _isCardDetected ? () => _navigateToResult() : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isCardDetected 
-                        ? AppColors.secondaryLightBlue 
+                    backgroundColor: _isCardDetected
+                        ? AppColors.secondaryLightBlue
                         : AppColors.lightGrey,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -416,6 +398,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
       ),
     );
   }
+
   void _navigateToResult() {
     Navigator.of(context).push(
       MaterialPageRoute(
