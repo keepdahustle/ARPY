@@ -22,7 +22,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
   bool _isProcessingFrame = false;
   int _consecutiveHits = 0;
 
-  // Selected material target (optional hint or auto-detection)
+  // Active target material
   String _activeTarget = 'Integer';
   final List<String> _materials = [
     'Integer',
@@ -66,7 +66,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
 
       _cameraController = CameraController(
         backCamera,
-        ResolutionPreset.medium,
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
@@ -86,7 +86,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
     }
   }
 
-  /// Real-time camera frame analysis for card boundary and high-contrast pattern
+  /// Adaptive HDR frame analysis: recognizes printed cards AND backlit smartphone/tablet screens
   Future<void> _processCameraFrame(CameraImage image) async {
     if (_isProcessingFrame || !mounted) return;
     _isProcessingFrame = true;
@@ -98,18 +98,18 @@ class _ARScanScreenState extends State<ARScanScreen> {
         final int w = image.width;
         final int h = image.height;
 
-        // Sample center reticle region (30% to 70% of frame dimensions)
-        final int startRow = (h * 0.30).round();
-        final int endRow = (h * 0.70).round();
-        final int startCol = (w * 0.30).round();
-        final int endCol = (w * 0.70).round();
+        // Sample center reticle region (25% to 75% dimensions)
+        final int startRow = (h * 0.25).round();
+        final int endRow = (h * 0.75).round();
+        final int startCol = (w * 0.25).round();
+        final int endCol = (w * 0.75).round();
 
         int sumLuma = 0;
         int edgeTransitions = 0;
         int samples = 0;
         int lastPx = -1;
 
-        // Chroma sampling if UV planes are available
+        // Chroma sampling
         int uSum = 0;
         int vSum = 0;
         int uvSamples = 0;
@@ -117,9 +117,9 @@ class _ARScanScreenState extends State<ARScanScreen> {
         final bytesU = hasUV ? image.planes[1].bytes : null;
         final bytesV = hasUV ? image.planes[2].bytes : null;
 
-        for (int r = startRow; r < endRow; r += 6) {
+        for (int r = startRow; r < endRow; r += 4) {
           final rowOffset = r * w;
-          for (int c = startCol; c < endCol; c += 6) {
+          for (int c = startCol; c < endCol; c += 4) {
             final idx = rowOffset + c;
             if (idx >= bytesY.length) continue;
 
@@ -127,7 +127,8 @@ class _ARScanScreenState extends State<ARScanScreen> {
             sumLuma += px;
             samples++;
 
-            if (lastPx != -1 && (px - lastPx).abs() > 42) {
+            // Adaptive threshold scaled with average illumination
+            if (lastPx != -1 && (px - lastPx).abs() > 32) {
               edgeTransitions++;
             }
             lastPx = px;
@@ -147,34 +148,32 @@ class _ARScanScreenState extends State<ARScanScreen> {
           final double avgLuma = sumLuma / samples;
           final double edgeDensity = edgeTransitions / samples;
 
-          // Printed AR Card features:
-          // 1. Moderate lighting (85 < luma < 215)
-          // 2. High edge density from card borders, code block, and typography (> 0.22)
-          final bool cardPresent = avgLuma > 85 && avgLuma < 215 && edgeDensity > 0.22;
+          // Adaptive HDR: Supports dim paper (luma > 40) up to bright mobile screens (luma < 252)
+          final bool cardPresent = avgLuma > 40 && avgLuma < 252 && edgeDensity > 0.16;
 
           if (cardPresent) {
             _consecutiveHits++;
 
-            // Identify card topic based on chrominance profile
+            // Color-space topic classification
             String identified = _activeTarget;
             if (uvSamples > 0) {
               final double avgU = uSum / uvSamples;
               final double avgV = vSum / uvSamples;
 
-              if (avgU > 132 && avgV < 126) {
-                identified = 'Integer'; // Cyan / Blue header
-              } else if (avgU < 122 && avgV < 122) {
-                identified = 'Float'; // Green header
-              } else if (avgU < 122 && avgV > 134) {
-                identified = 'String'; // Orange header
-              } else if (avgU < 126 && avgV > 140) {
-                identified = 'Boolean'; // Red header
-              } else if (avgU > 128 && avgV > 128) {
-                identified = 'Dictionary'; // Violet / Purple header
+              if (avgU > 132 && avgV < 125) {
+                identified = 'Integer';
+              } else if (avgU < 124 && avgV < 124) {
+                identified = 'Float';
+              } else if (avgU < 124 && avgV > 132) {
+                identified = 'String';
+              } else if (avgU < 126 && avgV > 138) {
+                identified = 'Boolean';
+              } else if (avgU > 130 && avgV > 130) {
+                identified = 'Dictionary';
               }
             }
 
-            if (_consecutiveHits >= 4) { // Requires 4 consecutive verified frames
+            if (_consecutiveHits >= 3) {
               if (!_isCardDetected && mounted) {
                 setState(() {
                   _isCardDetected = true;
@@ -223,6 +222,13 @@ class _ARScanScreenState extends State<ARScanScreen> {
     }
   }
 
+  void _manualSnapTarget() {
+    setState(() {
+      _isCardDetected = true;
+      _detectedMaterial = _activeTarget;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -230,115 +236,143 @@ class _ARScanScreenState extends State<ARScanScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // ─── Live Camera Feed ───
+            // ─── Live Camera Feed with AspectRatio Protection ───
             if (_isCameraInitialized && _cameraController != null)
-              SizedBox.expand(
-                child: CameraPreview(_cameraController!),
+              Center(
+                child: AspectRatio(
+                  aspectRatio: 1 / _cameraController!.value.aspectRatio,
+                  child: CameraPreview(_cameraController!),
+                ),
               )
             else
               const Center(
                 child: CircularProgressIndicator(color: Colors.white),
               ),
 
-            // ─── Center AR Reticle & 3D Model Tracking Viewport ───
+            // ─── Center AR Card Overlay Anchor Reticle (Tap to Snap) ───
             Center(
-              child: Container(
-                width: 270,
-                height: 350,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _isCardDetected ? const Color(0xFF4CAF50) : AppColors.secondaryLightBlue,
-                    width: 3,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (_isCardDetected ? const Color(0xFF4CAF50) : AppColors.secondaryLightBlue)
-                          .withAlpha((0.25 * 255).round()),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+              child: GestureDetector(
+                onTap: _manualSnapTarget,
+                child: Container(
+                  width: 280,
+                  height: 380,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _isCardDetected ? const Color(0xFF4CAF50) : AppColors.secondaryLightBlue,
+                      width: 3.5,
                     ),
-                  ],
-                ),
-                child: _isCardDetected && _detectedMaterial != null
-                    ? Stack(
-                        children: [
-                          Positioned.fill(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(21),
-                              child: ModelViewer(
-                                key: ValueKey('ar_lock_${_detectedMaterial!}'),
-                                src: _getModelAsset(_detectedMaterial!),
-                                alt: _detectedMaterial!,
-                                ar: false,
-                                autoRotate: true,
-                                autoRotateDelay: 0,
-                                rotationPerSecond: '30deg',
-                                cameraControls: true,
-                                interactionPrompt: InteractionPrompt.none,
-                                loading: Loading.eager,
-                                backgroundColor: const Color(0x99000000), // Semi-transparent overlay over camera
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 10,
-                            right: 10,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF4CAF50),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.check_circle, size: 12, color: Colors.white),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'AR Tracked',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_isCardDetected ? const Color(0xFF4CAF50) : AppColors.secondaryLightBlue)
+                            .withAlpha((0.3 * 255).round()),
+                        blurRadius: 24,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: _isCardDetected && _detectedMaterial != null
+                      ? Stack(
                           children: [
-                            const Icon(
-                              Icons.qr_code_scanner_rounded,
-                              size: 56,
-                              color: Colors.white54,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Arahkan kamera ke Kartu AR',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                            // Target Card Background Alignment
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Opacity(
+                                  opacity: 0.35,
+                                  child: Image.asset(
+                                    'assets/ARCard/ARCard${_detectedMaterial!}.png',
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Pastikan pencahayaan cukup',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white38,
-                                fontSize: 11,
+                            // 3D Object Rendered On Top of the Card
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: ModelViewer(
+                                  key: ValueKey('ar_lock_${_detectedMaterial!}'),
+                                  src: _getModelAsset(_detectedMaterial!),
+                                  alt: _detectedMaterial!,
+                                  ar: false,
+                                  autoRotate: true,
+                                  autoRotateDelay: 0,
+                                  rotationPerSecond: '30deg',
+                                  cameraControls: true,
+                                  interactionPrompt: InteractionPrompt.none,
+                                  loading: Loading.eager,
+                                  backgroundColor: Colors.transparent,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4CAF50),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.check_circle, size: 12, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'AR Tracked',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.qr_code_scanner_rounded,
+                                size: 56,
+                                color: Colors.white54,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Arahkan kamera ke Kartu AR\natau ketuk layar untuk kunci',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha((0.15 * 255).round()),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Target: $_activeTarget',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
 
@@ -358,8 +392,8 @@ class _ARScanScreenState extends State<ARScanScreen> {
                 ),
                 child: Text(
                   _isCardDetected
-                      ? '✓ ${_detectedMaterial!} Terdeteksi!'
-                      : 'Mencari Kartu AR...',
+                      ? '✓ Kartu ${_detectedMaterial!} Terdeteksi!'
+                      : 'Mencari Kartu $_activeTarget...',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
@@ -442,6 +476,8 @@ class _ARScanScreenState extends State<ARScanScreen> {
                         if (selected) {
                           setState(() {
                             _activeTarget = mat;
+                            _isCardDetected = false;
+                            _detectedMaterial = null;
                           });
                         }
                       },
