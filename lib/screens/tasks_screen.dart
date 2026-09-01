@@ -171,7 +171,7 @@ class _TasksScreenState extends State<TasksScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '6 Materi: Integer, Boolean, String, Float, Set, Dictionary',
+                        '5 Materi: Integer, Boolean, String, Float, Dictionary',
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           color: AppColors.secondaryIndigo,

@@ -28,7 +28,7 @@ class PythonMaterial {
   });
 }
 
-// Quiz Data untuk 6 materi dasar Python
+// Quiz Data untuk 5 materi dasar Python
 class QuizDataManager {
   static List<PythonMaterial> getAllMaterials() {
     return [
@@ -36,7 +36,6 @@ class QuizDataManager {
       _getBooleanMaterial(),
       _getStringMaterial(),
       _getFloatMaterial(),
-      _getSetMaterial(),
       _getDictionaryMaterial(),
     ];
   }
@@ -247,59 +246,6 @@ class QuizDataManager {
           correctAnswerIndex: 3,
           explanation:
               'Python menyediakan berbagai fungsi pembulatan: round() untuk pembulatan normal, floor() untuk pembulatan ke bawah, ceil() untuk pembulatan ke atas.',
-        ),
-      ],
-    );
-  }
-
-  static PythonMaterial _getSetMaterial() {
-    return PythonMaterial(
-      id: 'set',
-      name: 'Set',
-      description: 'Kumpulan elemen unik tanpa urutan',
-      icon: '◎',
-      questions: [
-        QuizQuestion(
-          question: 'Bagaimana cara membuat Set dalam Python?',
-          options: ['[1,2,3]', '{1,2,3}', '(1,2,3)', 'set(1,2,3)'],
-          correctAnswerIndex: 1,
-          explanation:
-              'Set dibuat menggunakan kurung kurawal {}. Set tidak dapat memiliki duplikat.',
-        ),
-        QuizQuestion(
-          question: 'Apa karakteristik utama dari Set?',
-          options: ['Urut dan bisa duplikat', 'Tidak urut dan tidak bisa duplikat', 'Urut dan tidak bisa duplikat', 'Tidak urut dan bisa duplikat'],
-          correctAnswerIndex: 1,
-          explanation:
-              'Set tidak memiliki urutan tertentu dan secara otomatis menghapus duplikat.',
-        ),
-        QuizQuestion(
-          question: 'Apa hasil dari {1,2,2,3}?',
-          options: ['{1,2,2,3}', '{1,2,3}', 'Error', '{3,2,1}'],
-          correctAnswerIndex: 1,
-          explanation:
-              'Set secara otomatis menghapus duplikat. Hasil dari {1,2,2,3} adalah {1,2,3}.',
-        ),
-        QuizQuestion(
-          question: 'Metode mana untuk menambah elemen ke Set?',
-          options: ['add()', 'append()', 'insert()', 'push()'],
-          correctAnswerIndex: 0,
-          explanation:
-              'Method add() digunakan untuk menambah satu elemen ke Set.',
-        ),
-        QuizQuestion(
-          question: 'Bagaimana cara menghapus semua elemen Set?',
-          options: ['del()', 'remove()', 'clear()', 'pop()'],
-          correctAnswerIndex: 2,
-          explanation:
-              'Method clear() digunakan untuk menghapus semua elemen dalam Set.',
-        ),
-        QuizQuestion(
-          question: 'Operasi mana yang merupakan gabungan dua Set?',
-          options: ['Set1 & Set2', 'Set1 | Set2', 'Set1 + Set2', 'Set1 - Set2'],
-          correctAnswerIndex: 1,
-          explanation:
-              'Operator | (pipe) digunakan untuk menggabungkan dua Set. Set1 | Set2',
         ),
       ],
     );

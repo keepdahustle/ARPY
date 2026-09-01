@@ -12,7 +12,7 @@ class MateriScreen extends StatelessWidget {
     this.materialName = '',
   });
 
-  // Data keenam materi dikumpulkan dalam satu List
+  // Data kelima materi dikumpulkan dalam satu List
   final List<Map<String, dynamic>> listMateri = const [
     {
       'nama': 'INTEGER',
@@ -74,22 +74,6 @@ class MateriScreen extends StatelessWidget {
         'Hanya memiliki dua nilai: True atau False.',
         'Wajib menggunakan huruf kapital di awal kata.',
         'Sering dihasilkan dari operasi perbandingan (>, <, ==).'
-      ]
-    },
-    {
-      'nama': 'SET',
-      'icon': Icons.shopping_basket_outlined,
-      'color': Colors.teal,
-      'definisi':
-          'Set adalah Kumpulan data unik (tidak ada duplikat), tidak berurutan, dan tidak bisa diakses melalui indeks.',
-      'penjelasan':
-          'Set sangat berguna ketika kamu ingin menyimpan banyak data namun memastikan tidak ada data yang kembar. Karena sifatnya yang tidak berurutan, kamu tidak bisa memanggil item di dalam Set menggunakan nomor urut (indeks).',
-      'contoh_kode':
-          'keranjang = {"apel", "jeruk", "tomat"}\nangka = {1, 2, 2, 3} # Hasil: {1, 2, 3}',
-      'poin': [
-        'Item di dalamnya selalu unik (tidak kembar).',
-        'Tidak memiliki indeks (unordered).',
-        'Didefinisikan menggunakan kurung kurawal {}.'
       ]
     },
     {

@@ -256,6 +256,14 @@ class _ARResultScreenState extends State<ARResultScreen> {
     switch (materialName.toLowerCase()) {
       case 'integer':
         return 'assets/3d/Integer.glb';
+      case 'float':
+        return 'assets/3d/Float.glb';
+      case 'string':
+        return 'assets/3d/String.glb';
+      case 'boolean':
+        return 'assets/3d/Boolean.glb';
+      case 'dictionary':
+        return 'assets/3d/Dictionary.glb';
       default:
         return 'assets/3d/Integer.glb';
     }
@@ -271,8 +279,6 @@ class _ARResultScreenState extends State<ARResultScreen> {
         return 'String adalah tipe data untuk teks atau karakter. Dalam Python, string ditulis di dalam tanda kutip, baik tunggal (\') maupun ganda (\"). Contoh: "Hello World" atau \'Python\'.';
       case 'boolean':
         return 'Boolean (bool) adalah tipe data logika yang hanya bernilai True atau False. Digunakan untuk evaluasi kondisi dan alur keputusan.';
-      case 'set':
-        return 'Set adalah tipe data koleksi yang tidak berurut dan tidak mengizinkan duplikasi. Set digunakan untuk menyimpan beberapa item unik dalam satu variabel.';
       case 'dictionary':
         return 'Dictionary adalah struktur data key-value pair yang terurut dan mutable untuk menyimpan data terstruktur.';
       default:

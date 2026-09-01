@@ -198,7 +198,7 @@ class _ARScanScreenState extends State<ARScanScreen> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
                               child: ModelViewer(
-                                src: 'assets/3d/Integer.glb',
+                                src: _getModelAsset(_detectedMaterial),
                                 alt: _detectedMaterial,
                                 ar: false,
                                 autoRotate: true,
@@ -358,5 +358,22 @@ class _ARScanScreenState extends State<ARScanScreen> {
         builder: (context) => ARResultScreen(materialName: _detectedMaterial),
       ),
     );
+  }
+
+  String _getModelAsset(String materialName) {
+    switch (materialName.toLowerCase()) {
+      case 'integer':
+        return 'assets/3d/Integer.glb';
+      case 'float':
+        return 'assets/3d/Float.glb';
+      case 'string':
+        return 'assets/3d/String.glb';
+      case 'boolean':
+        return 'assets/3d/Boolean.glb';
+      case 'dictionary':
+        return 'assets/3d/Dictionary.glb';
+      default:
+        return 'assets/3d/Integer.glb';
+    }
   }
 }

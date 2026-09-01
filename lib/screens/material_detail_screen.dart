@@ -210,21 +210,6 @@ Bayangkan "Saklar Lampu" atau "Pintu Sensor Otomatis". Saklar hanya punya dua po
    • `not` : Membalikkan nilai logika (not True -> False).
 3. Percabangan `if-elif-else`: Mengontrol arah jalan program berdasarkan kondisi boolean.""";
 
-      case 'set':
-        return """📌 APA ITU SET (set)?
-Set adalah struktur data koleksi yang bersifat *unordered* (tidak berurutan), *unindexed* (tidak memiliki indeks posisi), dan *unique* (otomatis menghapus duplikasi elemen). Dideklarasikan dengan kurung kurawal `{}` atau fungsi `set()`.
-
-💡 ANALOGI DUNIA NYATA:
-Bayangkan "Kantong Kelereng Unik" atau "Daftar Hadir Siswa". Meskipun seorang siswa memindai absensi 3 kali berturut-turut, namanya hanya tercatat satu kali di daftar hadir. Posisi namanya pun tidak terikat urutan tertentu.
-
-⚙️ KARAKTERISTIK PENTING DALAM PYTHON:
-1. Otomatis Menghilangkan Duplikat: Sangat ampuh untuk membersihkan data berulang dari form atau database.
-2. Operasi Himpunan Matematika Super Cepat:
-   • Irisan / Intersection (`&`): Elemen yang ada di kedua himpunan.
-   • Gabungan / Union (`|`): Menggabungkan semua elemen unik dari kedua himpunan.
-   • Selisih / Difference (`-`): Elemen yang hanya ada di himpunan pertama.
-3. Membership Testing Cepat: Pengecekan `item in my_set` berjalan dalam kompleksitas waktu O(1) konstan berkat mekanisme hashing.""";
-
       case 'dictionary':
         return """📌 APA ITU DICTIONARY (dict)?
 Dictionary adalah struktur data berbasis pemetaan Pasangan Kunci-Nilai (*Key-Value Pairs*). Kunci (Key) harus bersifat unik dan immutable (biasanya string atau int), sedangkan Nilai (Value) dapat berupa tipe data apa saja.
@@ -356,32 +341,6 @@ keranjang_belanja = []  # List kosong dianggap False
 
 if not keranjang_belanja:
     print("Keranjang Anda masih kosong, yuk belanja!")""";
-
-      case 'set':
-        return """# === 1. ELIMINASI DUPLIKASI DATA OTOMATIS ===
-daftar_id_peserta = [101, 102, 103, 101, 104, 102, 105, 101]
-
-# Konversi list ke set untuk mengambil ID unik
-peserta_unik = set(daftar_id_peserta)
-print("Data mentah (ada duplikat):", daftar_id_peserta)
-print("Data unik (bebas duplikat):", peserta_unik)
-print("Jumlah peserta asli:", len(peserta_unik))
-
-# === 2. OPERASI HIMPUNAN (SET OPERATIONS) ===
-skill_kelas_python = {"Variable", "Loop", "Function", "OOP", "AR"}
-skill_siswa = {"Variable", "Loop", "HTML", "CSS"}
-
-# Irisan (Intersection): Skill yang sudah dikuasai siswa di kelas
-skill_dikuasai = skill_kelas_python & skill_siswa
-print("Skill yang cocok:", skill_dikuasai) # {'Variable', 'Loop'}
-
-# Selisih (Difference): Skill yang masih harus dipelajari siswa
-skill_harus_belajar = skill_kelas_python - skill_siswa
-print("Materi yang belum dipelajari:", skill_harus_belajar) # {'Function', 'OOP', 'AR'}
-
-# === 3. MEMBERSHIP TESTING CEPAT ===
-if "AR" in skill_kelas_python:
-    print("Fitur AR tersedia di kurikulum!")""";
 
       case 'dictionary':
         return """# === 1. MEMBUAT & MENGAKSES STRUKTUR DATA USER ===
